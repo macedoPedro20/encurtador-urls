@@ -17,12 +17,21 @@ API REST para encurtar links, feita com **Python, FastAPI e SQLite**. Transforma
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 uvicorn app.main:app --reload
 ```
 
 Abra http://localhost:8000/docs para testar pela interface do Swagger.
+
+### Com Docker
+
+```bash
+docker build -t encurtador-urls .
+docker run -p 8000:8000 -v encurtador-data:/data encurtador-urls
+```
+
+O volume `encurtador-data` guarda o banco SQLite, então os links sobrevivem a reinicializações do container.
 
 ## Endpoints
 
@@ -49,6 +58,8 @@ curl -X POST http://localhost:8000/links \
 pytest
 ```
 
+A cada push e pull request, o GitHub Actions roda os testes em Python 3.12 e 3.13 (`.github/workflows/ci.yml`).
+
 ## Estrutura
 
 ```
@@ -73,5 +84,6 @@ tests/
 
 - [ ] Expiração de links
 - [ ] Autenticação e links por usuário
-- [ ] Dockerfile + deploy
-- [ ] GitHub Actions rodando os testes
+- [x] Dockerfile
+- [x] GitHub Actions rodando os testes
+- [ ] Deploy online
