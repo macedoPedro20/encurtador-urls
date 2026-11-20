@@ -20,6 +20,8 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://encurtador:encurtador@db:5432/encurtador
+      # Chave só para desenvolvimento local. Em produção use um valor secreto e aleatório.
+      SECRET_KEY: chave-apenas-para-desenvolvimento-local-nao-use-em-producao
     depends_on:
       db:
         condition: service_healthy

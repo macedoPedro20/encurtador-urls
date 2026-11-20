@@ -1,5 +1,6 @@
 """API do encurtador de URLs."""
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,19 +8,25 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app import services
-from app.database import Base, engine, get_db
-from app.models import Link
+from app import auth, services
+from app.auth import usuario_atual, usuario_opcional
+from app.database import get_db
+from app.migrate import aplicar_migracoes
+from app.models import Link, User
 from app.schemas import LinkCreate, LinkOut
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)  # cria as tabelas se não existirem
+    # Ao iniciar, leva o banco à versão mais recente do esquema (Alembic).
+    # AUTO_MIGRATE=0 desliga isso (os testes montam o banco por conta própria).
+    if os.getenv("AUTO_MIGRATE", "1") != "0":
+        aplicar_migracoes()
     yield
 
 
-app = FastAPI(title="Encurtador de URLs", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Encurtador de URLs", version="1.1.0", lifespan=lifespan)
+app.include_router(auth.router)
 
 
 def _para_saida(link: Link, request: Request) -> LinkOut:
@@ -47,9 +54,16 @@ def health():
 
 
 @app.post("/links", response_model=LinkOut, status_code=status.HTTP_201_CREATED)
-def criar(payload: LinkCreate, request: Request, db: Session = Depends(get_db)):
+def criar(
+    payload: LinkCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(usuario_opcional),
+):
+    # Aberto a todos: sem login o link fica anônimo; com login, passa a ser do usuário.
+    owner_id = usuario.id if usuario else None
     try:
-        link = services.criar_link(db, str(payload.url), payload.custom_code)
+        link = services.criar_link(db, str(payload.url), payload.custom_code, owner_id)
     except services.CodigoInvalido as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     except services.CodigoEmUso as e:
@@ -58,8 +72,11 @@ def criar(payload: LinkCreate, request: Request, db: Session = Depends(get_db)):
 
 
 @app.get("/links", response_model=list[LinkOut])
-def listar(request: Request, db: Session = Depends(get_db)):
-    return [_para_saida(link, request) for link in services.listar_links(db)]
+def listar(
+    request: Request, db: Session = Depends(get_db), usuario: User = Depends(usuario_atual)
+):
+    """Lista só os links do usuário logado."""
+    return [_para_saida(link, request) for link in services.listar_links(db, usuario.id)]
 
 
 @app.get("/links/{code}", response_model=LinkOut)
@@ -71,8 +88,8 @@ def estatisticas(code: str, request: Request, db: Session = Depends(get_db)):
 
 
 @app.delete("/links/{code}", status_code=status.HTTP_204_NO_CONTENT)
-def apagar(code: str, db: Session = Depends(get_db)):
-    if not services.apagar_link(db, code):
+def apagar(code: str, db: Session = Depends(get_db), usuario: User = Depends(usuario_atual)):
+    if not services.apagar_link(db, code, usuario.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Link não encontrado.")
 
 
