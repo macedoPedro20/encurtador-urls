@@ -2,7 +2,7 @@
 
 API REST para encurtar links, feita com **Python, FastAPI e SQLAlchemy** (SQLite localmente, PostgreSQL em produção). Transforma uma URL longa em um código curto (ex.: `http://localhost:8000/aB3xY9`), redireciona quem acessa e conta os cliques.
 
-**Demo online:** https://encurtador-urls-r1rj.onrender.com/docs
+**Demo online:** https://encurtador-urls-r1rj.onrender.com
 
 > Roda no plano gratuito da Render: se a demo estiver parada, a primeira visita pode demorar cerca de um minuto para "acordar". É uma demo: o banco gratuito da Render expira após 30 dias, então os dados podem ser apagados.
 
