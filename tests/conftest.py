@@ -10,6 +10,10 @@ O banco indicado deve ser descartável: as tabelas são criadas e apagadas a cad
 
 import os
 
+# Os testes montam o banco sozinhos (create_all); sem isso o app rodaria as migrações
+# no banco padrão (arquivo encurtador.db) ao iniciar. Precisa vir antes de importar o app.
+os.environ["AUTO_MIGRATE"] = "0"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

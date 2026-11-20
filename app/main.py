@@ -1,5 +1,6 @@
 """API do encurtador de URLs."""
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,14 +10,18 @@ from sqlalchemy.orm import Session
 
 from app import auth, services
 from app.auth import usuario_atual, usuario_opcional
-from app.database import Base, engine, get_db
+from app.database import get_db
+from app.migrate import aplicar_migracoes
 from app.models import Link, User
 from app.schemas import LinkCreate, LinkOut
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)  # cria as tabelas se não existirem
+    # Ao iniciar, leva o banco à versão mais recente do esquema (Alembic).
+    # AUTO_MIGRATE=0 desliga isso (os testes montam o banco por conta própria).
+    if os.getenv("AUTO_MIGRATE", "1") != "0":
+        aplicar_migracoes()
     yield
 
 
