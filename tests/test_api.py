@@ -71,10 +71,11 @@ def test_codigo_personalizado_invalido_ou_reservado(client, codigo):
     assert r.status_code == 422
 
 
-def test_listar_e_apagar(client):
-    code = client.post("/links", json={"url": "https://example.com"}).json()["code"]
-    assert [l["code"] for l in client.get("/links").json()] == [code]
+def test_listar_e_apagar_com_login(client, login):
+    headers = login("ana@example.com")
+    code = client.post("/links", json={"url": "https://example.com"}, headers=headers).json()["code"]
+    assert [l["code"] for l in client.get("/links", headers=headers).json()] == [code]
 
-    assert client.delete(f"/links/{code}").status_code == 204
-    assert client.get("/links").json() == []
-    assert client.delete(f"/links/{code}").status_code == 404
+    assert client.delete(f"/links/{code}", headers=headers).status_code == 204
+    assert client.get("/links", headers=headers).json() == []
+    assert client.delete(f"/links/{code}", headers=headers).status_code == 404

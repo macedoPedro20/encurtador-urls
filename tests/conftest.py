@@ -53,3 +53,20 @@ def client():
     # Limpa o banco para o próximo teste (importa no PostgreSQL, que persiste).
     Base.metadata.drop_all(engine)
     engine.dispose()
+
+
+SENHA_PADRAO = "senha-segura-123"
+
+
+@pytest.fixture()
+def login(client):
+    """Devolve uma função que cadastra (se preciso) e loga um usuário,
+    retornando os headers com o token: `headers = login("ana@example.com")`."""
+
+    def _login(email: str, senha: str = SENHA_PADRAO) -> dict:
+        client.post("/auth/register", json={"email": email, "password": senha})
+        r = client.post("/auth/login", data={"username": email, "password": senha})
+        assert r.status_code == 200, r.text
+        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    return _login
