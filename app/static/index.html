@@ -63,13 +63,49 @@
     .empty { color: var(--muted); margin: 0; }
     footer { text-align: center; color: var(--muted); font-size: .875rem; }
     footer a { color: inherit; }
+    .topbar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-bottom: 8px; min-height: 40px; }
+    .topbar .who { color: var(--muted); font-size: .875rem; margin-right: auto; word-break: break-all; }
+    button.small { padding: 6px 12px; font-size: .875rem; }
+    button.danger { color: var(--err); }
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .switch { margin-top: 12px; font-size: .875rem; color: var(--muted); }
+    .switch button { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline; }
+    .switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     [hidden] { display: none !important; }
   </style>
 </head>
 <body>
 <main>
+  <div class="topbar">
+    <span id="who" class="who" hidden></span>
+    <button id="open-auth" class="small" type="button">Entrar</button>
+    <button id="logout" class="small" type="button" hidden>Sair</button>
+  </div>
+
   <h1>Encurtador de URLs</h1>
   <p class="sub">Cole um link longo e receba um endereço curto.</p>
+
+  <form id="auth-form" class="card" hidden novalidate>
+    <h2 id="auth-title">Entrar</h2>
+    <div class="field">
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="email" required>
+    </div>
+    <div class="field">
+      <label for="password">Senha</label>
+      <input id="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required>
+      <div id="password-hint" class="hint" hidden>Mínimo de 8 caracteres.</div>
+    </div>
+    <div class="actions">
+      <button id="auth-submit" class="primary" type="submit">Entrar</button>
+      <button id="auth-cancel" type="button">Cancelar</button>
+    </div>
+    <div id="auth-error" class="error" role="alert" hidden></div>
+    <p class="switch">
+      <span id="switch-text">Ainda não tem conta?</span>
+      <button id="switch-mode" type="button">Criar conta</button>
+    </p>
+  </form>
 
   <form id="form" class="card" novalidate>
     <div class="field">
@@ -93,6 +129,7 @@
     <h2 id="mine">Seus links neste navegador</h2>
     <ul id="list"></ul>
     <p id="empty" class="empty">Os links que você criar aparecem aqui, com a contagem de cliques.</p>
+    <p id="anon-note" class="hint">Sem login, só este navegador lembra dos seus links e não é possível apagá-los. Entre para guardá-los na sua conta.</p>
   </section>
 
   <footer>
@@ -102,22 +139,109 @@
 
 <script>
 (() => {
-  const KEY = "encurtador:meus-links";
+  const KEY_LINKS = "encurtador:meus-links";
+  const KEY_TOKEN = "encurtador:token";
   const $ = (id) => document.getElementById(id);
 
-  // Guardamos só os códigos criados neste navegador; os dados vêm da API.
-  const lerCodigos = () => {
-    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; }
-  };
-  const salvarCodigos = (codigos) => {
-    try { localStorage.setItem(KEY, JSON.stringify(codigos.slice(0, 20))); } catch {}
-  };
+  let token = null;
+  let modo = "login"; // "login" ou "cadastro"
 
-  function mostrarErro(msg) {
-    $("error").textContent = msg;
-    $("error").hidden = !msg;
+  // localStorage pode falhar (modo privado, bloqueio): sempre dentro de try/catch.
+  const ler = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const gravar = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+
+  const lerCodigos = () => { try { return JSON.parse(ler(KEY_LINKS)) || []; } catch { return []; } };
+  const salvarCodigos = (c) => gravar(KEY_LINKS, JSON.stringify(c.slice(0, 20)));
+
+  const headersAuth = () => (token ? { Authorization: "Bearer " + token } : {});
+
+  function mostrar(id, msg) {
+    $(id).textContent = msg;
+    $(id).hidden = !msg;
   }
 
+  // ---------- Sessão ----------
+  function aplicarSessao(email) {
+    const logado = Boolean(email);
+    $("who").textContent = logado ? email : "";
+    $("who").hidden = !logado;
+    $("logout").hidden = !logado;
+    $("open-auth").hidden = logado;
+    $("anon-note").hidden = logado;
+    $("mine").textContent = logado ? "Seus links" : "Seus links neste navegador";
+    if (logado) $("auth-form").hidden = true;
+    carregarLista();
+  }
+
+  function sair(mensagem) {
+    token = null;
+    gravar(KEY_TOKEN, null);
+    aplicarSessao(null);
+    if (mensagem) mostrar("error", mensagem);
+  }
+
+  async function restaurarSessao() {
+    token = ler(KEY_TOKEN);
+    if (!token) return aplicarSessao(null);
+    try {
+      const r = await fetch("/auth/me", { headers: headersAuth() });
+      if (r.ok) return aplicarSessao((await r.json()).email);
+      if (r.status === 401) return sair();
+    } catch {}
+    aplicarSessao(null); // sem conexão: segue como visitante, sem apagar o token
+  }
+
+  function definirModo(novo) {
+    modo = novo;
+    const cadastro = modo === "cadastro";
+    $("auth-title").textContent = cadastro ? "Criar conta" : "Entrar";
+    $("auth-submit").textContent = cadastro ? "Criar conta" : "Entrar";
+    $("switch-text").textContent = cadastro ? "Já tem conta?" : "Ainda não tem conta?";
+    $("switch-mode").textContent = cadastro ? "Entrar" : "Criar conta";
+    $("password").autocomplete = cadastro ? "new-password" : "current-password";
+    $("password-hint").hidden = !cadastro;
+    mostrar("auth-error", "");
+  }
+
+  async function enviarAuth(evento) {
+    evento.preventDefault();
+    mostrar("auth-error", "");
+    const email = $("email").value.trim();
+    const senha = $("password").value;
+    if (!email || !senha) { mostrar("auth-error", "Informe e-mail e senha."); return; }
+
+    $("auth-submit").disabled = true;
+    try {
+      if (modo === "cadastro") {
+        const r = await fetch("/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: senha }),
+        });
+        if (r.status === 409) { mostrar("auth-error", "Já existe uma conta com esse e-mail."); return; }
+        if (r.status === 422) { mostrar("auth-error", "Informe um e-mail válido e uma senha de 8 a 128 caracteres."); return; }
+        if (!r.ok) { mostrar("auth-error", "Não foi possível criar a conta agora."); return; }
+      }
+      // O login da API usa o formato de formulário do OAuth2 (campo "username" = e-mail).
+      const r = await fetch("/auth/login", {
+        method: "POST",
+        body: new URLSearchParams({ username: email, password: senha }),
+      });
+      if (r.status === 401) { mostrar("auth-error", "E-mail ou senha incorretos."); return; }
+      if (!r.ok) { mostrar("auth-error", "Não foi possível entrar agora."); return; }
+
+      token = (await r.json()).access_token;
+      gravar(KEY_TOKEN, token);
+      $("password").value = "";
+      aplicarSessao(email.toLowerCase());
+    } catch {
+      mostrar("auth-error", "Sem conexão com o servidor.");
+    } finally {
+      $("auth-submit").disabled = false;
+    }
+  }
+
+  // ---------- Encurtar ----------
   function mensagemDeErro(status, corpo) {
     if (status === 409) return "Esse código já está em uso. Escolha outro.";
     if (status === 422) {
@@ -130,12 +254,12 @@
 
   async function encurtar(evento) {
     evento.preventDefault();
-    mostrarErro("");
+    mostrar("error", "");
     $("result").hidden = true;
 
     const url = $("url").value.trim();
     const code = $("code").value.trim();
-    if (!url) { mostrarErro("Informe uma URL."); return; }
+    if (!url) { mostrar("error", "Informe uma URL."); return; }
 
     const corpo = { url };
     if (code) corpo.custom_code = code;
@@ -144,21 +268,23 @@
     try {
       const r = await fetch("/links", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headersAuth() },
         body: JSON.stringify(corpo),
       });
       const dados = await r.json().catch(() => null);
-      if (!r.ok) { mostrarErro(mensagemDeErro(r.status, dados)); return; }
+      if (r.status === 401) { sair("Sua sessão expirou. Entre de novo e tente outra vez."); return; }
+      if (!r.ok) { mostrar("error", mensagemDeErro(r.status, dados)); return; }
 
       $("short").textContent = dados.short_url;
       $("short").href = dados.short_url;
       $("result").hidden = false;
       $("copy").textContent = "Copiar";
 
-      salvarCodigos([dados.code, ...lerCodigos().filter((c) => c !== dados.code)]);
+      // Logado: a lista vem da conta. Visitante: lembramos o código neste navegador.
+      if (!token) salvarCodigos([dados.code, ...lerCodigos().filter((c) => c !== dados.code)]);
       carregarLista();
     } catch {
-      mostrarErro("Sem conexão com o servidor.");
+      mostrar("error", "Sem conexão com o servidor.");
     } finally {
       $("submit").disabled = false;
     }
@@ -173,15 +299,34 @@
     }
   }
 
-  async function carregarLista() {
+  // ---------- Lista ----------
+  async function buscarLinks() {
+    if (token) {
+      try {
+        const r = await fetch("/links", { headers: headersAuth() });
+        if (r.status === 401) { sair("Sua sessão expirou. Entre novamente."); return []; }
+        return r.ok ? await r.json() : [];
+      } catch { return []; }
+    }
     const codigos = lerCodigos();
     const respostas = await Promise.all(codigos.map((c) =>
       fetch("/links/" + encodeURIComponent(c)).then((r) => (r.ok ? r.json() : null)).catch(() => null)
     ));
-    // Links apagados no servidor somem da lista local.
     const links = respostas.filter(Boolean);
-    salvarCodigos(links.map((l) => l.code));
+    salvarCodigos(links.map((l) => l.code)); // links que não existem mais saem da lista local
+    return links;
+  }
 
+  async function apagar(code) {
+    try {
+      const r = await fetch("/links/" + encodeURIComponent(code), { method: "DELETE", headers: headersAuth() });
+      if (r.status === 401) { sair("Sua sessão expirou. Entre novamente."); return; }
+    } catch {}
+    carregarLista();
+  }
+
+  async function carregarLista() {
+    const links = await buscarLinks();
     const ul = $("list");
     ul.replaceChildren();
     for (const l of links) {
@@ -195,10 +340,21 @@
       a.href = l.short_url;
       a.target = "_blank";
       a.rel = "noopener";
+      const lado = document.createElement("span");
+      lado.className = "actions";
       const cliques = document.createElement("span");
       cliques.className = "clicks";
       cliques.textContent = l.clicks + (l.clicks === 1 ? " clique" : " cliques");
-      meta.append(a, cliques);
+      lado.append(cliques);
+      if (token) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "small danger";
+        del.textContent = "Apagar";
+        del.addEventListener("click", () => apagar(l.code));
+        lado.append(del);
+      }
+      meta.append(a, lado);
 
       const orig = document.createElement("div");
       orig.className = "orig";
@@ -212,7 +368,12 @@
 
   $("form").addEventListener("submit", encurtar);
   $("copy").addEventListener("click", copiar);
-  carregarLista();
+  $("auth-form").addEventListener("submit", enviarAuth);
+  $("open-auth").addEventListener("click", () => { definirModo("login"); $("auth-form").hidden = false; $("email").focus(); });
+  $("auth-cancel").addEventListener("click", () => { $("auth-form").hidden = true; });
+  $("switch-mode").addEventListener("click", () => definirModo(modo === "login" ? "cadastro" : "login"));
+  $("logout").addEventListener("click", () => sair());
+  restaurarSessao();
 })();
 </script>
 </body>
