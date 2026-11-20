@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 class LinkCreate(BaseModel):
@@ -19,3 +19,26 @@ class LinkOut(BaseModel):
     short_url: str
     clicks: int
     created_at: datetime
+
+
+class UserCreate(BaseModel):
+    email: str = Field(max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+    # mode="before": normaliza ANTES de validar o formato (senão o espaço reprovaria).
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalizar_email(cls, valor):
+        return valor.strip().lower() if isinstance(valor, str) else valor
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
