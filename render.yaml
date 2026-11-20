@@ -1,4 +1,11 @@
 # Blueprint da Render: https://render.com/docs/blueprint-spec
+databases:
+  - name: encurtador-db
+    plan: free
+    databaseName: encurtador
+    user: encurtador
+    ipAllowList: [] # só serviços da própria Render acessam (conexão interna)
+
 services:
   - type: web
     name: encurtador-urls
@@ -6,3 +13,8 @@ services:
     plan: free
     healthCheckPath: /health
     autoDeploy: true # novo deploy a cada push na branch principal
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: encurtador-db
+          property: connectionString
