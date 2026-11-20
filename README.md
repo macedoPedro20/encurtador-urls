@@ -72,7 +72,13 @@ curl -X POST http://localhost:8000/links \
 pytest
 ```
 
-A cada push e pull request, o GitHub Actions roda os testes em Python 3.12 e 3.13 (`.github/workflows/ci.yml`).
+Por padrão os testes usam SQLite em memória. Para rodá-los contra um PostgreSQL (descartável, pois as tabelas são criadas e apagadas a cada teste), defina `TEST_DATABASE_URL`:
+
+```bash
+TEST_DATABASE_URL=postgresql://usuario:senha@localhost:5432/teste pytest
+```
+
+A cada push e pull request, o GitHub Actions roda os testes em Python 3.12 e 3.13 com SQLite, e também em um job separado com um serviço PostgreSQL (`.github/workflows/ci.yml`).
 
 ## Deploy (Render)
 
@@ -115,5 +121,5 @@ tests/
 - [x] Configuração de deploy (Render)
 - [x] Link da demo online neste README
 - [x] Trocar SQLite por PostgreSQL (persistência)
-- [ ] Rodar os testes também contra PostgreSQL no CI
+- [x] Rodar os testes também contra PostgreSQL no CI
 - [ ] Migrações de banco com Alembic
