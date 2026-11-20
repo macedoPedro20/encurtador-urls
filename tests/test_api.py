@@ -32,6 +32,13 @@ def client():
     app.dependency_overrides.clear()
 
 
+def test_pagina_inicial_e_servida(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    assert "Encurtador de URLs" in r.text
+
+
 def test_criar_link_gera_codigo_curto(client):
     r = client.post("/links", json={"url": "https://example.com/uma/pagina/longa"})
     assert r.status_code == 201

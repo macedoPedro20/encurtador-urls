@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Encurtador de URLs</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5f6b7a;
+      --border: #d9dee5; --accent: #2457d6; --accent-text: #ffffff;
+      --ok: #16794a; --err: #b42318; --err-bg: #fdecea;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1216; --card: #171b21; --text: #e8ebef; --muted: #9aa5b3;
+        --border: #2a313b; --accent: #6b93ff; --accent-text: #0b1020;
+        --ok: #4cc38a; --err: #ff8b80; --err-bg: #2b1715;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 640px; margin: 0 auto; padding: 40px 16px 64px; }
+    h1 { font-size: 1.75rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; margin-bottom: 20px;
+    }
+    label { display: block; font-size: .875rem; font-weight: 600; margin: 0 0 6px; }
+    input {
+      width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    }
+    input:focus-visible, button:focus-visible, a:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 2px;
+    }
+    .field { margin-bottom: 14px; }
+    .hint { font-size: .8125rem; color: var(--muted); margin-top: 4px; }
+    button {
+      font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--card); color: var(--text);
+      padding: 10px 16px;
+    }
+    button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    button:disabled { opacity: .6; cursor: progress; }
+    .error {
+      background: var(--err-bg); color: var(--err); border-radius: 8px;
+      padding: 10px 12px; margin-top: 14px;
+    }
+    .result { display: flex; gap: 8px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+    .result a { font-weight: 600; color: var(--ok); word-break: break-all; flex: 1 1 200px; }
+    h2 { font-size: 1.125rem; margin: 0 0 12px; }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { padding: 12px 0; border-top: 1px solid var(--border); }
+    li:first-child { border-top: 0; padding-top: 0; }
+    .short { font-weight: 600; word-break: break-all; color: var(--accent); }
+    .orig { color: var(--muted); font-size: .875rem; word-break: break-all; }
+    .meta { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .clicks { white-space: nowrap; color: var(--muted); font-size: .875rem; }
+    .empty { color: var(--muted); margin: 0; }
+    footer { text-align: center; color: var(--muted); font-size: .875rem; }
+    footer a { color: inherit; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Encurtador de URLs</h1>
+  <p class="sub">Cole um link longo e receba um endereço curto.</p>
+
+  <form id="form" class="card" novalidate>
+    <div class="field">
+      <label for="url">URL para encurtar</label>
+      <input id="url" type="url" placeholder="https://exemplo.com/uma/pagina/bem/longa" required autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="code">Código personalizado (opcional)</label>
+      <input id="code" type="text" placeholder="meu-link" minlength="3" maxlength="32" autocomplete="off">
+      <div class="hint">3 a 32 caracteres: letras, números, "-" e "_".</div>
+    </div>
+    <button id="submit" class="primary" type="submit">Encurtar</button>
+    <div id="error" class="error" role="alert" hidden></div>
+    <div id="result" class="result" hidden>
+      <a id="short" target="_blank" rel="noopener"></a>
+      <button id="copy" type="button">Copiar</button>
+    </div>
+  </form>
+
+  <section class="card" aria-labelledby="mine">
+    <h2 id="mine">Seus links neste navegador</h2>
+    <ul id="list"></ul>
+    <p id="empty" class="empty">Os links que você criar aparecem aqui, com a contagem de cliques.</p>
+  </section>
+
+  <footer>
+    <a href="/docs">Documentação da API</a>
+  </footer>
+</main>
+
+<script>
+(() => {
+  const KEY = "encurtador:meus-links";
+  const $ = (id) => document.getElementById(id);
+
+  // Guardamos só os códigos criados neste navegador; os dados vêm da API.
+  const lerCodigos = () => {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; }
+  };
+  const salvarCodigos = (codigos) => {
+    try { localStorage.setItem(KEY, JSON.stringify(codigos.slice(0, 20))); } catch {}
+  };
+
+  function mostrarErro(msg) {
+    $("error").textContent = msg;
+    $("error").hidden = !msg;
+  }
+
+  function mensagemDeErro(status, corpo) {
+    if (status === 409) return "Esse código já está em uso. Escolha outro.";
+    if (status === 422) {
+      const d = corpo && corpo.detail;
+      if (typeof d === "string") return d;
+      return "Confira os dados: use uma URL http(s) válida e um código de 3 a 32 caracteres.";
+    }
+    return "Não foi possível encurtar agora. Tente novamente.";
+  }
+
+  async function encurtar(evento) {
+    evento.preventDefault();
+    mostrarErro("");
+    $("result").hidden = true;
+
+    const url = $("url").value.trim();
+    const code = $("code").value.trim();
+    if (!url) { mostrarErro("Informe uma URL."); return; }
+
+    const corpo = { url };
+    if (code) corpo.custom_code = code;
+
+    $("submit").disabled = true;
+    try {
+      const r = await fetch("/links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      });
+      const dados = await r.json().catch(() => null);
+      if (!r.ok) { mostrarErro(mensagemDeErro(r.status, dados)); return; }
+
+      $("short").textContent = dados.short_url;
+      $("short").href = dados.short_url;
+      $("result").hidden = false;
+      $("copy").textContent = "Copiar";
+
+      salvarCodigos([dados.code, ...lerCodigos().filter((c) => c !== dados.code)]);
+      carregarLista();
+    } catch {
+      mostrarErro("Sem conexão com o servidor.");
+    } finally {
+      $("submit").disabled = false;
+    }
+  }
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText($("short").textContent);
+      $("copy").textContent = "Copiado!";
+    } catch {
+      $("copy").textContent = "Selecione e copie";
+    }
+  }
+
+  async function carregarLista() {
+    const codigos = lerCodigos();
+    const respostas = await Promise.all(codigos.map((c) =>
+      fetch("/links/" + encodeURIComponent(c)).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+    ));
+    // Links apagados no servidor somem da lista local.
+    const links = respostas.filter(Boolean);
+    salvarCodigos(links.map((l) => l.code));
+
+    const ul = $("list");
+    ul.replaceChildren();
+    for (const l of links) {
+      const li = document.createElement("li");
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const a = document.createElement("a");
+      a.className = "short";
+      a.textContent = l.short_url;
+      a.href = l.short_url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      const cliques = document.createElement("span");
+      cliques.className = "clicks";
+      cliques.textContent = l.clicks + (l.clicks === 1 ? " clique" : " cliques");
+      meta.append(a, cliques);
+
+      const orig = document.createElement("div");
+      orig.className = "orig";
+      orig.textContent = l.url;
+
+      li.append(meta, orig);
+      ul.append(li);
+    }
+    $("empty").hidden = links.length > 0;
+  }
+
+  $("form").addEventListener("submit", encurtar);
+  $("copy").addEventListener("click", copiar);
+  carregarLista();
+})();
+</script>
+</body>
+</html>

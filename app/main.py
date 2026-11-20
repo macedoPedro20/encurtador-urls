@@ -1,9 +1,10 @@
 """API do encurtador de URLs."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import services
@@ -30,6 +31,14 @@ def _para_saida(link: Link, request: Request) -> LinkOut:
         clicks=link.clicks,
         created_at=link.created_at,
     )
+
+
+PAGINA_INICIAL = Path(__file__).parent / "static" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+def pagina_inicial():
+    return FileResponse(PAGINA_INICIAL, media_type="text/html")
 
 
 @app.get("/health")

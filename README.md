@@ -13,6 +13,7 @@ API REST para encurtar links, feita com **Python, FastAPI e SQLAlchemy** (SQLite
 - Validação de entrada (só `http`/`https`; rejeita `javascript:` e similares)
 - Tratamento de colisão de códigos e de códigos reservados
 - Listagem, consulta de estatísticas e remoção de links
+- **Interface web** em `/`: formulário para encurtar, botão de copiar e lista dos seus links com cliques
 - Documentação interativa automática (Swagger) em `/docs`
 - Testes automatizados com banco em memória
 
@@ -56,6 +57,7 @@ A API escolhe o banco pela variável `DATABASE_URL`. Sem ela, usa SQLite (`encur
 | GET    | `/links/{code}`  | Estatísticas de um link                     |
 | DELETE | `/links/{code}`  | Remove um link                              |
 | GET    | `/{code}`        | Redireciona para a URL original             |
+| GET    | `/`              | Interface web (página única)                |
 | GET    | `/health`        | Verifica se a API está no ar                |
 
 Exemplo:
@@ -94,6 +96,8 @@ app/
   services.py   # regras de negócio (gerar código, clicar, apagar)
   models.py     # tabela do banco (SQLAlchemy)
   schemas.py    # validação e formato das respostas (Pydantic)
+  static/
+    index.html  # interface web (HTML, CSS e JS puros, sem dependências)
   database.py   # conexão com o banco
 tests/
   test_api.py
@@ -109,6 +113,7 @@ tests/
 ## Próximos passos
 
 - [ ] Expiração de links
+- [x] Front-end simples (página única em `/`)
 - [ ] Autenticação e links por usuário
 - [x] Dockerfile
 - [x] GitHub Actions rodando os testes
