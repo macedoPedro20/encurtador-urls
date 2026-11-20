@@ -41,6 +41,15 @@ def test_criar_link_gera_codigo_curto(client):
     assert corpo["clicks"] == 0
 
 
+def test_created_at_tem_fuso_horario_consistente(client):
+    criado = client.post("/links", json={"url": "https://example.com"}).json()
+    consultado = client.get(f"/links/{criado['code']}").json()
+
+    # Antes o SQLite devolvia a data sem fuso ("...Z" só na criação).
+    assert criado["created_at"].endswith("Z")
+    assert consultado["created_at"] == criado["created_at"]
+
+
 def test_url_invalida_retorna_422(client):
     r = client.post("/links", json={"url": "isso-nao-e-uma-url"})
     assert r.status_code == 422
