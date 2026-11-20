@@ -2,6 +2,10 @@
 
 API REST para encurtar links, feita com **Python, FastAPI e SQLAlchemy** (SQLite localmente, PostgreSQL em produção). Transforma uma URL longa em um código curto (ex.: `http://localhost:8000/aB3xY9`), redireciona quem acessa e conta os cliques.
 
+**Demo online:** https://encurtador-urls-r1rj.onrender.com/docs
+
+> Roda no plano gratuito da Render: se a demo estiver parada, a primeira visita pode demorar cerca de um minuto para "acordar". Os links criados na demo são apagados quando o serviço reinicia.
+
 ## Funcionalidades
 
 - Encurtar URLs com código aleatório (base62, gerado com `secrets`) ou **personalizado**
@@ -109,7 +113,7 @@ tests/
 - [x] Dockerfile
 - [x] GitHub Actions rodando os testes
 - [x] Configuração de deploy (Render)
-- [ ] Link da demo online neste README
+- [x] Link da demo online neste README
 - [x] Trocar SQLite por PostgreSQL (persistência)
 - [ ] Rodar os testes também contra PostgreSQL no CI
 - [ ] Migrações de banco com Alembic
