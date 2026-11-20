@@ -1,35 +1,4 @@
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.database import Base, get_db
-from app.main import app
-
-
-@pytest.fixture()
-def client():
-    # Banco SQLite em memória, novo a cada teste: testes isolados e rápidos.
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-
-    def override_get_db():
-        db = Session()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
 
 
 def test_pagina_inicial_e_servida(client):
