@@ -16,8 +16,10 @@ def _agora() -> datetime:
 class UTCDateTime(TypeDecorator):
     """DateTime que sempre volta com fuso UTC.
 
-    O SQLite não guarda fuso horário: ele devolve datas "ingênuas" (sem tzinfo).
-    Gravamos tudo em UTC e reanexamos o fuso ao ler.
+    SQLite não guarda fuso horário e devolve datas "ingênuas" (sem tzinfo).
+    No PostgreSQL, a coluna `timestamp` também não tem fuso. Por isso gravamos
+    sempre em UTC, sem tzinfo, e reanexamos o UTC ao ler. Assim os dois bancos
+    se comportam igual e a conversão não depende do fuso da sessão do banco.
     """
 
     impl = DateTime
@@ -28,7 +30,7 @@ class UTCDateTime(TypeDecorator):
             return None
         if value.tzinfo is None:
             raise ValueError("Datas sem fuso horário não são aceitas.")
-        return value.astimezone(timezone.utc)
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
 
     def process_result_value(self, value, dialect):
         if value is None:

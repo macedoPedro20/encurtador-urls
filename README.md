@@ -1,6 +1,6 @@
 # Encurtador de URLs
 
-API REST para encurtar links, feita com **Python, FastAPI e SQLite**. Transforma uma URL longa em um código curto (ex.: `http://localhost:8000/aB3xY9`), redireciona quem acessa e conta os cliques.
+API REST para encurtar links, feita com **Python, FastAPI e SQLAlchemy** (SQLite localmente, PostgreSQL em produção). Transforma uma URL longa em um código curto (ex.: `http://localhost:8000/aB3xY9`), redireciona quem acessa e conta os cliques.
 
 **Demo online:** https://encurtador-urls-r1rj.onrender.com/docs
 
@@ -37,6 +37,16 @@ docker run -p 8000:8000 -v encurtador-data:/data encurtador-urls
 
 O volume `encurtador-data` guarda o banco SQLite, então os links sobrevivem a reinicializações do container.
 
+### Com Docker Compose (API + PostgreSQL)
+
+```bash
+docker compose up --build
+```
+
+Sobe a API em http://localhost:8000 junto com um PostgreSQL. Os dados ficam no volume `pgdata`. Para apagar tudo, incluindo os dados: `docker compose down -v`.
+
+A API escolhe o banco pela variável `DATABASE_URL`. Sem ela, usa SQLite (`encurtador.db`); com uma URL `postgresql://...`, usa PostgreSQL.
+
 ## Endpoints
 
 | Método | Rota             | Descrição                                   |
@@ -72,7 +82,9 @@ O repositório inclui um `render.yaml` (Blueprint). Para publicar:
 2. A Render lê o `render.yaml`, constrói a imagem do `Dockerfile` e sobe o serviço.
 3. Cada push na `main` gera um novo deploy automaticamente.
 
-> **Atenção:** no plano gratuito o disco é efêmero e o serviço "dorme" após alguns minutos sem uso. Por isso o banco SQLite é reiniciado a cada novo deploy ou reinício, e o primeiro acesso depois de um tempo parado pode demorar. Para persistência de verdade, o próximo passo é trocar o SQLite por PostgreSQL.
+O Blueprint também cria um banco **PostgreSQL** (`encurtador-db`) e injeta a conexão interna na variável `DATABASE_URL` do serviço, então os links persistem entre deploys.
+
+> **Atenção (plano gratuito):** o serviço "dorme" após alguns minutos sem uso, e o primeiro acesso depois disso pode demorar. O PostgreSQL gratuito da Render **expira após 30 dias** (é preciso recriá-lo ou migrar para um plano pago para manter os dados).
 
 ## Estrutura
 
@@ -102,4 +114,6 @@ tests/
 - [x] GitHub Actions rodando os testes
 - [x] Configuração de deploy (Render)
 - [x] Link da demo online neste README
-- [ ] Trocar SQLite por PostgreSQL (persistência)
+- [x] Trocar SQLite por PostgreSQL (persistência)
+- [ ] Rodar os testes também contra PostgreSQL no CI
+- [ ] Migrações de banco com Alembic
