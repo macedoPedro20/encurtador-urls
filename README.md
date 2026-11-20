@@ -60,6 +60,16 @@ pytest
 
 A cada push e pull request, o GitHub Actions roda os testes em Python 3.12 e 3.13 (`.github/workflows/ci.yml`).
 
+## Deploy (Render)
+
+O repositório inclui um `render.yaml` (Blueprint). Para publicar:
+
+1. Na [Render](https://render.com), escolha **New → Blueprint** e conecte este repositório.
+2. A Render lê o `render.yaml`, constrói a imagem do `Dockerfile` e sobe o serviço.
+3. Cada push na `main` gera um novo deploy automaticamente.
+
+> **Atenção:** no plano gratuito o disco é efêmero e o serviço "dorme" após alguns minutos sem uso. Por isso o banco SQLite é reiniciado a cada novo deploy ou reinício, e o primeiro acesso depois de um tempo parado pode demorar. Para persistência de verdade, o próximo passo é trocar o SQLite por PostgreSQL.
+
 ## Estrutura
 
 ```
@@ -86,4 +96,6 @@ tests/
 - [ ] Autenticação e links por usuário
 - [x] Dockerfile
 - [x] GitHub Actions rodando os testes
-- [ ] Deploy online
+- [x] Configuração de deploy (Render)
+- [ ] Link da demo online neste README
+- [ ] Trocar SQLite por PostgreSQL (persistência)
