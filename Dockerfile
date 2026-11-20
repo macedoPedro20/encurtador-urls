@@ -19,4 +19,8 @@ USER appuser
 VOLUME /data
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Plataformas como Render/Railway definem a porta na variável PORT (padrão: 8000).
+# --proxy-headers faz o app enxergar o https do proxy da plataforma, para que o
+# short_url saia como https://... e não http://...
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

@@ -1,0 +1,8 @@
+# Blueprint da Render: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: encurtador-urls
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true # novo deploy a cada push na branch principal
